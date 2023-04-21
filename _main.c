@@ -28,10 +28,8 @@ int main (void) {
     char **words = NULL;
     char *word = strtok(line, " ");
     int num_words = 0;
-    while (word != NULL) {
-        
+    while (word != NULL && strcmp(word, "\n") != 0) {
         words = (char **)realloc(words, sizeof(char *) * (num_words + 1));  // resize array to fit new word
-
         words[num_words] = (char *)malloc(strlen(word) + 1);    // allocate memory for new word and copy it
         strcpy(words[num_words], word);
 
@@ -42,24 +40,35 @@ int main (void) {
     if (! is_piped) {
         char* input_file = NULL;
         char *output_file = NULL;
-        char* command = malloc(strlen(words[0]) + 1);
-        strcpy(command, words[0]);
+        char* append_file = NULL;
+        char* command = words[0];
         for (int i=1; i < num_words; i++) {
-            if (strchr(words[i], '<') != NULL) {
+            // printf("%s\n", words[i]);
+            if (strcmp(words[i], "<") == 0) {
                 if (i+1 == num_words) {
                     printf("Not input given\n");
                     return -1;
                 }
-                input_file = malloc(strlen(words[i+1]) + 1);
-                strcpy(input_file, words[i+1]);
+                input_file = words[i+1];
             }
-            else if (strchr(words[i], '>') != NULL) {
+            else if (strcmp(words[i], ">") == 0) {
                 if (i+1 == num_words) {
                     printf("Not output given\n");
                     return -1;
                 }
-                output_file = malloc(strlen(words[i+1]) + 1);
-                strcpy(output_file, words[i+1]);
+                output_file = words[i+1];
+            }
+            else if (strcmp(words[i], ">>") == 0) {
+                if (i+1 == num_words) {
+                    printf("Not output given\n");
+                    return -1;
+                }
+                append_file = words[i+1];
+            }
+            else {
+                if (!(strcmp(words[i-1], ">") == 0 || strcmp(words[i-1], "<") == 0 || strcmp(words[i-1], ">>") == 0)) {
+                    input_file = words[i];
+                }
             }
         }
 
@@ -91,11 +100,21 @@ int main (void) {
             }
         }
         
+        if (append_file) {
+            int fd_out = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd_out == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_out, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         execvp(command, NULL);
 
-        free(command);
-        free(input_file);
-        free(output_file);
     }
     
     
@@ -104,7 +123,7 @@ int main (void) {
         free(words[i]);
     }
     free(words);
-    free(line);
+    // free(line);
     
     return 0;
 }
