@@ -85,6 +85,7 @@ int main (void) {
                 perror("dup2");
                 exit(EXIT_FAILURE);
             }
+            close(fd_in);
         }
         
         if (output_file) {
@@ -98,19 +99,21 @@ int main (void) {
                 perror("dup2");
                 exit(EXIT_FAILURE);
             }
+            close(fd_out);
         }
         
         if (append_file) {
-            int fd_out = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-            if (fd_out == -1) {
+            int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd_append == -1) {
                 perror("open");
                 exit(EXIT_FAILURE);
             }
             
-            if (dup2(fd_out, STDOUT_FILENO) == -1) {
+            if (dup2(fd_append, STDOUT_FILENO) == -1) {
                 perror("dup2");
                 exit(EXIT_FAILURE);
             }
+            close(fd_append);
         }
 
         execvp(command, NULL);
@@ -126,4 +129,3 @@ int main (void) {
     // free(line);
     
     return 0;
-}
