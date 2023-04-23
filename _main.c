@@ -8,7 +8,6 @@
 
 #include <fcntl.h>
 
-
 int main (void) {
     
     printf("in-mysh-now:>");
@@ -38,6 +37,7 @@ int main (void) {
     }
 
     if (! is_piped) {
+        // pπρέπει να κάνω το input πίνακα
         char* input_file = NULL;
         char *output_file = NULL;
         char* append_file = NULL;
@@ -119,6 +119,87 @@ int main (void) {
         execvp(command, NULL);
 
     }
+    // if is piped
+    // execArgsPiped(char** parsed, char** parsedpipe)
+        // words = (char **)realloc(words, sizeof(char *) * (num_words + 1));  // resize array to fit new word
+        // words[num_words] = (char *)malloc(strlen(word) + 1);    // allocate memory for new word and copy it
+        // strcpy(words[num_words], word);
+    else {
+        char **parsed = NULL;
+        char **parsedpipe = NULL;
+        bool piped_part = false;
+        int parsed_size = 0;
+        int parsedpipe_size = 0;
+
+        printf("start it\n");
+        for (int i=0; i < num_words; i++) {
+            printf("%s\n", words[i]);
+            if (strcmp(words[i], "|") == 0) {
+                piped_part = true;
+            }
+            else if (!piped_part) {
+                parsed = (char **)realloc(parsed, sizeof(char *) * (parsed_size + 1));
+                parsed[parsed_size] = (char *)malloc(strlen(words[i]) + 1);
+                strcpy(parsed[parsed_size], words[i]);
+                parsed_size++;
+            }
+            else {
+                parsedpipe = (char **)realloc(parsedpipe, sizeof(char *) * (parsedpipe_size + 1));
+                parsedpipe[parsedpipe_size] = (char *)malloc(strlen(words[i]) + 1);
+                strcpy(parsedpipe[parsedpipe_size], words[i]);
+                parsedpipe_size++;
+            }
+        }
+        printf("MADE IT\n");
+        int pipefd[2]; 
+        pid_t p1, p2;
+    
+        if (pipe(pipefd) < 0) {
+            printf("\nPipe could not be initialized");
+            exit(EXIT_FAILURE);
+        }
+        p1 = fork();
+        if (p1 < 0) {
+            printf("\nCould not fork");
+            exit(EXIT_FAILURE);
+        }
+    
+        if (p1 == 0) {
+            // Child 1 executing..
+            // It only needs to write at the write end
+            close(pipefd[0]);
+            dup2(pipefd[1], STDOUT_FILENO);
+            close(pipefd[1]);
+            if (execvp(parsed[0], parsed) < 0) {
+                printf("\nCould not execute command 1..");
+                exit(0);
+            }
+        } else {
+            // Parent executing
+            p2 = fork();
+    
+            if (p2 < 0) {
+                printf("\nCould not fork");
+                exit(EXIT_FAILURE);
+            }
+    
+            // Child 2 executing..
+            // It only needs to read at the read end
+            if (p2 == 0) {
+                close(pipefd[1]);
+                dup2(pipefd[0], STDIN_FILENO);
+                close(pipefd[0]);
+                if (execvp(parsedpipe[0], parsedpipe) < 0) {
+                    printf("\nCould not execute command 2..");
+                    exit(0);
+                }
+            } else {
+                // parent executing, waiting for two children
+                wait(NULL);
+                wait(NULL);
+            }
+        }
+    }
     
     
     // free memory
@@ -129,3 +210,4 @@ int main (void) {
     // free(line);
     
     return 0;
+}
