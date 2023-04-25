@@ -11,7 +11,143 @@
 #define MAX_ARGS 10
 #define MAX_SIZE_ARG 100
 
-bool read_line(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) {
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) ;
+void execSimple(char** parsed);
+
+void execRedirection(char** command, int numOfCom) {
+    char* input_file = NULL;
+    char *output_file = NULL;
+    char* append_file = NULL;
+    for (int i=1; i < numOfCom; i++) {
+        // printf("%s\n", words[i]);
+        if (strcmp(command[i], "<") == 0) {
+            if (i+1 == numOfCom) {
+                printf("Not input given\n");
+                return -1;
+            }
+            input_file = command[i+1];
+        }
+        else if (strcmp(command[i], ">") == 0) {
+            if (i+1 == numOfCom) {
+                printf("Not output given\n");
+                return ;
+            }
+            output_file = command[i+1];
+        }
+        else if (strcmp(command[i], ">>") == 0) {
+            if (i+1 == numOfCom) {
+                printf("Not output given\n");
+                return ;
+            }
+            append_file = command[i+1];
+        }
+        else {
+            if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
+                input_file = command[i];
+            }
+        }
+    }
+
+    printf("%s %s %s", command, input_file, output_file);
+
+    if (input_file) {
+        int fd_in = open(input_file, O_RDONLY);
+        if (fd_in == -1) {
+            perror("open");
+            exit(EXIT_FAILURE);
+        }
+        
+        if (dup2(fd_in, STDIN_FILENO) == -1) {
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }
+        close(fd_in);
+    }
+    
+    if (output_file) {
+        int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd_out == -1) {
+            perror("open");
+            exit(EXIT_FAILURE);
+        }
+        
+        if (dup2(fd_out, STDOUT_FILENO) == -1) {
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }
+        close(fd_out);
+    }
+
+    if (append_file) {
+        int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd_append == -1) {
+            perror("open");
+            exit(EXIT_FAILURE);
+        }
+        
+        if (dup2(fd_append, STDOUT_FILENO) == -1) {
+            perror("dup2");
+            exit(EXIT_FAILURE);
+        }
+        close(fd_append);
+    }
+
+    execvp(command[0], NULL);
+}
+
+int main (void) {
+    
+    
+    int numOfCom = 0;
+    bool is_redirection;
+    bool is_piped;
+    bool is_background;
+
+    char** command = NULL;
+    // char** command = malloc(MAX_ARGS * sizeof(char*));
+    // for (int i=0; i < MAX_ARGS; i++)
+    //     command[i] = malloc(MAX_SIZE_ARG* sizeof(char*));
+    
+    int ij = 0;
+    while (ij < 3) {
+        
+        if (!read_line(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
+            return EXIT_FAILURE;
+        
+        if (strcmp(command[0], "reutno\n") == 0)
+            break;
+        
+        printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
+        for (int i = 0; i < numOfCom; i++)
+            printf("%s\n", command[i]);
+        
+        if (!is_redirection && !is_piped && !is_background) {
+            execSimple(command);
+        }
+        else if (is_redirection && !is_piped && !is_background) {
+            execRedirection(command, numOfCom);
+        }
+
+
+        for (int i = 0; i <numOfCom; i++) {
+            free(command[i]);
+        }
+        free(command);
+        ij ++;
+    }
+    
+    printf("Exiting ...\n");
+    // for (int i = 0; i < MAX_ARGS; i++) {
+    //     free(command[i]);
+    // }
+    // free(command);
+    
+    return 0;
+}
+
+
+
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) {
 
     printf("in-mysh-now:>");
 
@@ -56,8 +192,8 @@ bool read_line(char*** command, int* numOfCom, bool* is_redirection, bool* is_pi
     return true;
 }
 
-void execArgs(char** parsed) {
-    // Forking a child
+
+void execSimple(char** parsed) {
     pid_t pid = fork(); 
   
     if (pid == -1) {
@@ -70,52 +206,4 @@ void execArgs(char** parsed) {
         exit(0);
     }
     wait(NULL); 
-}
-
-
-int main (void) {
-    
-    
-    int numOfCom = 0;
-    bool is_redirection;
-    bool is_piped;
-    bool is_background;
-
-    char** command = NULL;
-    // char** command = malloc(MAX_ARGS * sizeof(char*));
-    // for (int i=0; i < MAX_ARGS; i++)
-    //     command[i] = malloc(MAX_SIZE_ARG* sizeof(char*));
-    
-    int ij = 0;
-    while (ij < 3) {
-        
-        if (!read_line(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
-            return EXIT_FAILURE;
-        
-        if (strcmp(command[0], "reutno\n") == 0)
-            break;
-        
-        printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
-        for (int i = 0; i < numOfCom; i++)
-            printf("%s\n", command[i]);
-        
-        if (!is_redirection && !is_piped && !is_background) {
-            execArgs(command);
-        }
-
-
-        for (int i = 0; i <numOfCom; i++) {
-            free(command[i]);
-        }
-        free(command);
-        ij ++;
-    }
-    
-    printf("Exiting ...\n");
-    // for (int i = 0; i < MAX_ARGS; i++) {
-    //     free(command[i]);
-    // }
-    // free(command);
-    
-    return 0;
 }
