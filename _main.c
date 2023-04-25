@@ -15,93 +15,100 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
 void execSimple(char** parsed);
 
 void execRedirection(char** command, int numOfCom) {
-    char* input_file = NULL;
-    char *output_file = NULL;
-    char* append_file = NULL;
-    for (int i=1; i < numOfCom; i++) {
-        // printf("%s\n", words[i]);
-        if (strcmp(command[i], "<") == 0) {
-            if (i+1 == numOfCom) {
-                printf("Not input given\n");
-                return -1;
+    pid_t pid = fork(); 
+  
+    if (pid == -1) {
+        printf("\nFailed forking child..\n");
+        return;
+    } else if (pid == 0) {
+        char* input_file = NULL;
+        char *output_file = NULL;
+        char* append_file = NULL;
+        for (int i=1; i < numOfCom; i++) {
+            printf("%s\n", command[i]);
+            if (strcmp(command[i], "<") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not input given\n");
+                    return -1;
+                }
+                input_file = command[i+1];
             }
-            input_file = command[i+1];
-        }
-        else if (strcmp(command[i], ">") == 0) {
-            if (i+1 == numOfCom) {
-                printf("Not output given\n");
-                return ;
+            else if (strcmp(command[i], ">") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not output given\n");
+                    return ;
+                }
+                output_file = command[i+1];
             }
-            output_file = command[i+1];
-        }
-        else if (strcmp(command[i], ">>") == 0) {
-            if (i+1 == numOfCom) {
-                printf("Not output given\n");
-                return ;
+            else if (strcmp(command[i], ">>") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not output given\n");
+                    return ;
+                }
+                append_file = command[i+1];
             }
-            append_file = command[i+1];
-        }
-        else {
-            if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
-                input_file = command[i];
+            else {
+                if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
+                    input_file = command[i];
+                }
             }
         }
-    }
 
-    printf("%s %s %s", command, input_file, output_file);
-
-    if (input_file) {
-        int fd_in = open(input_file, O_RDONLY);
-        if (fd_in == -1) {
-            perror("open");
-            exit(EXIT_FAILURE);
+        if (input_file) {
+            int fd_in = open(input_file, O_RDONLY);
+            if (fd_in == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_in, STDIN_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_in);
         }
         
-        if (dup2(fd_in, STDIN_FILENO) == -1) {
-            perror("dup2");
-            exit(EXIT_FAILURE);
+        if (output_file) {
+            int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd_out == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_out, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_out);
         }
-        close(fd_in);
-    }
-    
-    if (output_file) {
-        int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        if (fd_out == -1) {
-            perror("open");
-            exit(EXIT_FAILURE);
-        }
-        
-        if (dup2(fd_out, STDOUT_FILENO) == -1) {
-            perror("dup2");
-            exit(EXIT_FAILURE);
-        }
-        close(fd_out);
-    }
 
-    if (append_file) {
-        int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-        if (fd_append == -1) {
-            perror("open");
-            exit(EXIT_FAILURE);
+        if (append_file) {
+            int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd_append == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_append, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_append);
         }
-        
-        if (dup2(fd_append, STDOUT_FILENO) == -1) {
-            perror("dup2");
-            exit(EXIT_FAILURE);
-        }
-        close(fd_append);
-    }
 
-    execvp(command[0], NULL);
+        execvp(command[0], NULL);
+        exit(0);
+    }
+    wait(NULL);
 }
 
 int main (void) {
     
     
     int numOfCom = 0;
-    bool is_redirection;
-    bool is_piped;
-    bool is_background;
+    bool is_redirection = false;
+    bool is_piped= true;
+    bool is_background = false;
 
     char** command = NULL;
     // char** command = malloc(MAX_ARGS * sizeof(char*));
@@ -111,15 +118,15 @@ int main (void) {
     int ij = 0;
     while (ij < 3) {
         
-        if (!read_line(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
+        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
             return EXIT_FAILURE;
         
         if (strcmp(command[0], "reutno\n") == 0)
             break;
         
         printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
-        for (int i = 0; i < numOfCom; i++)
-            printf("%s\n", command[i]);
+        // for (int i = 0; i < numOfCom; i++)
+        //     printf("%s\n", command[i]);
         
         if (!is_redirection && !is_piped && !is_background) {
             execSimple(command);
@@ -160,15 +167,15 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
     }
 
     *is_redirection = false;
-    if (strstr(read, "<") != NULL && strstr(read, ">") != NULL && strstr(read, ">>") != NULL)
+    if (strstr(read, "<") || strstr(read, ">") || strstr(read, ">>") )
         *is_redirection = true;
 
     *is_piped = false;
-    if (strstr(read, "|") != NULL)
+    if (strstr(read, "|") )
         *is_piped = true;
 
     *is_background = false;
-    if (strstr(read, "&") != NULL)
+    if (strstr(read, "&") )
         *is_background = true;
 
     int i = 0;
