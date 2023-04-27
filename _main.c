@@ -13,97 +13,46 @@
 
 bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) ;
 void execSimple(char** parsed);
+void execRedirection(char** command, int numOfCom);
 
-void execRedirection(char** command, int numOfCom) {
-    pid_t pid = fork(); 
-  
-    if (pid == -1) {
-        printf("\nFailed forking child..\n");
-        return;
-    } else if (pid == 0) {
-        char* input_file = NULL;
-        char *output_file = NULL;
-        char* append_file = NULL;
-        for (int i=1; i < numOfCom; i++) {
-            printf("%s\n", command[i]);
-            if (strcmp(command[i], "<") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not input given\n");
-                    return -1;
-                }
-                input_file = command[i+1];
+
+void backgroundComAnalysis(char** command, int numOfCom) {
+    
+    char parts[numOfCom][MAX_ARGS];
+    int ij;
+    bool is_redirection = false;
+    bool is_piped= true;
+    for (int i=0; i < numOfCom; i++) {
+        if (strcmp(command[i], "&") == 0) {
+
+            if (is_redirection)
+                execRedirection(parts, ij);
+            else
+                execSimple(parts);
+
+            for (int i = 0; i <numOfCom; i++) {
+                free(parts[i]);
             }
-            else if (strcmp(command[i], ">") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not output given\n");
-                    return ;
-                }
-                output_file = command[i+1];
-            }
-            else if (strcmp(command[i], ">>") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not output given\n");
-                    return ;
-                }
-                append_file = command[i+1];
-            }
-            else {
-                if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
-                    input_file = command[i];
-                }
-            }
+            free(parts);
+            ij = 0;
         }
+        else {
+            // parts[ij] = command[i];
+            if (strcmp(command[i], "<") == 0|| strcmp(command[i], ">") == 0 || strcmp(command[i], ">>") == 0 )
+                is_redirection = true;
 
-        if (input_file) {
-            int fd_in = open(input_file, O_RDONLY);
-            if (fd_in == -1) {
-                perror("open");
-                exit(EXIT_FAILURE);
-            }
+            if (strcmp(command[i], "|") == 0 )
+                is_piped = true;
             
-            if (dup2(fd_in, STDIN_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_in);
+            strcpy(parts[ij], command[i]);
         }
-        
-        if (output_file) {
-            int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd_out == -1) {
-                perror("open");
-                exit(EXIT_FAILURE);
-            }
-            
-            if (dup2(fd_out, STDOUT_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_out);
-        }
-
-        if (append_file) {
-            int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-            if (fd_append == -1) {
-                perror("open");
-                exit(EXIT_FAILURE);
-            }
-            
-            if (dup2(fd_append, STDOUT_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_append);
-        }
-
-        execvp(command[0], NULL);
-        exit(0);
+        ij ++;
     }
-    wait(NULL);
+
 }
 
+
 int main (void) {
-    
     
     int numOfCom = 0;
     bool is_redirection = false;
@@ -134,7 +83,9 @@ int main (void) {
         else if (is_redirection && !is_piped && !is_background) {
             execRedirection(command, numOfCom);
         }
-
+        else if (is_background) {
+            backgroundComAnalysis(command, numOfCom);
+        }
 
         for (int i = 0; i <numOfCom; i++) {
             free(command[i]);
@@ -213,4 +164,92 @@ void execSimple(char** parsed) {
         exit(0);
     }
     wait(NULL); 
+}
+
+void execRedirection(char** command, int numOfCom) {
+    pid_t pid = fork(); 
+  
+    if (pid == -1) {
+        printf("\nFailed forking child..\n");
+        return;
+    } else if (pid == 0) {
+        char* input_file = NULL;
+        char *output_file = NULL;
+        char* append_file = NULL;
+        for (int i=1; i < numOfCom; i++) {
+            // printf("%s\n", command[i]);
+            if (strcmp(command[i], "<") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not input given\n");
+                    return -1;
+                }
+                input_file = command[i+1];
+            }
+            else if (strcmp(command[i], ">") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not output given\n");
+                    return ;
+                }
+                output_file = command[i+1];
+            }
+            else if (strcmp(command[i], ">>") == 0) {
+                if (i+1 == numOfCom) {
+                    printf("Not output given\n");
+                    return ;
+                }
+                append_file = command[i+1];
+            }
+            else {
+                if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
+                    input_file = command[i];
+                }
+            }
+        }
+
+        if (input_file) {
+            int fd_in = open(input_file, O_RDONLY);
+            if (fd_in == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_in, STDIN_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_in);
+        }
+        
+        if (output_file) {
+            int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd_out == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_out, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_out);
+        }
+
+        if (append_file) {
+            int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd_append == -1) {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+            
+            if (dup2(fd_append, STDOUT_FILENO) == -1) {
+                perror("dup2");
+                exit(EXIT_FAILURE);
+            }
+            close(fd_append);
+        }
+
+        execvp(command[0], NULL);
+        exit(0);
+    }
+    wait(NULL);
 }
