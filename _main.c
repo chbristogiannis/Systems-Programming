@@ -13,7 +13,7 @@
 
 bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) ;
 void execSimple(char** parsed);
-void execRedirection(char** command, int numOfCom);
+bool execRedirection(char** command, int numOfCom);
 
 
 void backgroundComAnalysis(char** command, int numOfCom) {
@@ -64,16 +64,28 @@ int main (void) {
     // for (int i=0; i < MAX_ARGS; i++)
     //     command[i] = malloc(MAX_SIZE_ARG* sizeof(char*));
     
-    int ij = 0;
-    while (ij < 3) {
+    while (true) {
         
         if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
-            return EXIT_FAILURE;
+            continue;;
         
         if (strcmp(command[0], "reutno\n") == 0)
             break;
         
-        printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
+        if (strcmp(command[0], "exit") == 0) {
+            break;
+        }
+        else if (strcmp(command[0], "cd") == 0) {
+            if (numOfCom == 1) {
+                chdir(getenv("HOME"));
+            }
+            else {
+                chdir(command[1]);
+            }
+            continue;
+        }
+
+        // printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
         // for (int i = 0; i < numOfCom; i++)
         //     printf("%s\n", command[i]);
         
@@ -91,7 +103,6 @@ int main (void) {
             free(command[i]);
         }
         free(command);
-        ij ++;
     }
     
     printf("Exiting ...\n");
@@ -152,104 +163,80 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
 
 
 void execSimple(char** parsed) {
-    pid_t pid = fork(); 
-  
+    pid_t pid = fork();
     if (pid == -1) {
-        printf("\nFailed forking child..\n");
+        perror("fork");
         return;
     } else if (pid == 0) {
         if (execvp(parsed[0], parsed) < 0) {
             printf("\nCould not execute command..\n");
         }
         exit(0);
+    } else {
+        int status;
+        waitpid(pid, &status, 0);
     }
-    wait(NULL); 
 }
 
-void execRedirection(char** command, int numOfCom) {
-    pid_t pid = fork(); 
-  
-    if (pid == -1) {
-        printf("\nFailed forking child..\n");
-        return;
-    } else if (pid == 0) {
-        char* input_file = NULL;
-        char *output_file = NULL;
-        char* append_file = NULL;
-        for (int i=1; i < numOfCom; i++) {
-            // printf("%s\n", command[i]);
-            if (strcmp(command[i], "<") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not input given\n");
-                    return -1;
-                }
-                input_file = command[i+1];
+bool execRedirection(char** command, int numOfCom) {
+    int in = STDIN_FILENO, out = STDOUT_FILENO;
+    int orig_in = dup(in), orig_out = dup(out); // store original file descriptors
+    for (int i = 0; i < numOfCom; i++) {
+        if (strcmp(command[i], "<") == 0) {
+            if (i == numOfCom - 1) {
+                fprintf(stderr, "Missing input redirection file\n");
+                return false;
             }
-            else if (strcmp(command[i], ">") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not output given\n");
-                    return ;
-                }
-                output_file = command[i+1];
-            }
-            else if (strcmp(command[i], ">>") == 0) {
-                if (i+1 == numOfCom) {
-                    printf("Not output given\n");
-                    return ;
-                }
-                append_file = command[i+1];
-            }
-            else {
-                if (!(strcmp(command[i-1], ">") == 0 || strcmp(command[i-1], "<") == 0 || strcmp(command[i-1], ">>") == 0)) {
-                    input_file = command[i];
-                }
-            }
-        }
-
-        if (input_file) {
-            int fd_in = open(input_file, O_RDONLY);
-            if (fd_in == -1) {
+            in = open(command[i + 1], O_RDONLY);
+            if (in < 0) {
                 perror("open");
-                exit(EXIT_FAILURE);
+                return false;
             }
-            
-            if (dup2(fd_in, STDIN_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_in);
+            dup2(in, STDIN_FILENO);
+            close(in);
+            command[i] = NULL;
+            i++;
         }
-        
-        if (output_file) {
-            int fd_out = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd_out == -1) {
+        else if (strcmp(command[i], ">") == 0) {
+            if (i == numOfCom - 1) {
+                fprintf(stderr, "Missing output redirection file\n");
+                return false;
+            }
+            out = open(command[i + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (out < 0) {
                 perror("open");
-                exit(EXIT_FAILURE);
+                return false;
             }
-            
-            if (dup2(fd_out, STDOUT_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_out);
+            dup2(out, STDOUT_FILENO);
+            close(out);
+            command[i] = NULL;
+            i++;
         }
-
-        if (append_file) {
-            int fd_append = open(append_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
-            if (fd_append == -1) {
+        else if (strcmp(command[i], ">>") == 0) {
+            if (i == numOfCom - 1) {
+                fprintf(stderr, "Missing output redirection file\n");
+                return false;
+            }
+            out = open(command[i + 1], O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (out < 0) {
                 perror("open");
-                exit(EXIT_FAILURE);
+                return false;
             }
-            
-            if (dup2(fd_append, STDOUT_FILENO) == -1) {
-                perror("dup2");
-                exit(EXIT_FAILURE);
-            }
-            close(fd_append);
+            dup2(out, STDOUT_FILENO);
+            close(out);
+            command[i] = NULL;
+            i++;
         }
-
-        execvp(command[0], NULL);
-        exit(0);
     }
-    wait(NULL);
+
+    bool success = true;
+    execute_command(command);
+
+    // reset standard input and output file descriptors
+    dup2(orig_in, STDIN_FILENO);
+    dup2(orig_out, STDOUT_FILENO);
+    close(orig_in);
+    close(orig_out);
+
+    return success;
 }
