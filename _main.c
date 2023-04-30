@@ -18,37 +18,44 @@ bool execRedirection(char** command, int numOfCom);
 
 void backgroundComAnalysis(char** command, int numOfCom) {
     
-    char parts[numOfCom][MAX_ARGS];
-    int ij;
-    bool is_redirection = false;
-    bool is_piped= true;
-    for (int i=0; i < numOfCom; i++) {
+    char** background_command = (char**) malloc(MAX_ARGS * sizeof(char*));
+    int background_count = 0;
+
+    // Copy elements until "&" character is read
+    for (int i = 0; i < numOfCom; i++) {
         if (strcmp(command[i], "&") == 0) {
-
-            if (is_redirection)
-                execRedirection(parts, ij);
-            else
-                execSimple(parts);
-
-            for (int i = 0; i <numOfCom; i++) {
-                free(parts[i]);
+            for (int j=0; j < background_count; j++) {
+                printf("%s\n", background_command[j]);
             }
-            free(parts);
-            ij = 0;
+            background_command[background_count] = NULL;
+            
+            // pid_t pid = fork();
+            // if (pid == -1) {
+            //     perror("fork");
+            //     return;
+            // } else if (pid == 0) {
+            //     if (execvp(parsed[0], parsed) < 0) {
+            //         printf("\nCould not execute command..\n");
+            //     }
+            //     exit(0);
+            // } else {
+            //     int status;
+            //     waitpid(pid, &status, 0);
+            // }
+
+            
+            for (int j=0; j < background_count; j++) {
+                free(background_command[j]);
+            }
+            background_count = 0;
         }
         else {
-            // parts[ij] = command[i];
-            if (strcmp(command[i], "<") == 0|| strcmp(command[i], ">") == 0 || strcmp(command[i], ">>") == 0 )
-                is_redirection = true;
-
-            if (strcmp(command[i], "|") == 0 )
-                is_piped = true;
-            
-            strcpy(parts[ij], command[i]);
+            background_command[background_count] = (char*) malloc(strlen(command[i]) + 1);
+            strcpy(background_command[background_count], command[i]);
+            background_count++;
         }
-        ij ++;
-    }
 
+    }
 }
 
 
@@ -229,8 +236,7 @@ bool execRedirection(char** command, int numOfCom) {
         }
     }
 
-    bool success = true;
-    execute_command(command);
+    execSimple(command);
 
     // reset standard input and output file descriptors
     dup2(orig_in, STDIN_FILENO);
@@ -238,5 +244,5 @@ bool execRedirection(char** command, int numOfCom) {
     close(orig_in);
     close(orig_out);
 
-    return success;
+    return true;
 }
