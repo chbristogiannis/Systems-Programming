@@ -8,20 +8,26 @@
 
 #include <fcntl.h>
 
+#include <dirent.h>
+
 #define MAX_ARGS 10
 #define MAX_SIZE_ARG 100
+#define MAX_FILES 10
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) ;
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard) ;
 void execSimple(char** parsed);
 bool execRedirection(char** command, int numOfCom);
 void backgroundComAnalysis(char** command, int numOfCom) ;
+int match(char *pattern, char *str);
+void wildcardsComAnalysis(char **command, int numOfCom) ;
 
 int main (void) {
     
     int numOfCom = 0;
     bool is_redirection = false;
-    bool is_piped= true;
+    bool is_piped= false;
     bool is_background = false;
+    bool has_wildcard = false;
 
     char** command = NULL;
     // char** command = malloc(MAX_ARGS * sizeof(char*));
@@ -30,7 +36,7 @@ int main (void) {
     
     while (true) {
         
-        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background))
+        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background, &has_wildcard))
             continue;;
         
         if (strcmp(command[0], "reutno\n") == 0)
@@ -49,11 +55,11 @@ int main (void) {
             continue;
         }
 
-        // printf("%d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background);
+        printf("%d %d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background, has_wildcard);
         // for (int i = 0; i < numOfCom; i++)
         //     printf("%s\n", command[i]);
         
-        if (!is_redirection && !is_piped && !is_background) {
+        if (!is_redirection && !is_piped && !is_background && !has_wildcard) {
             execSimple(command);
         }
         else if (is_redirection && !is_piped && !is_background) {
@@ -61,6 +67,9 @@ int main (void) {
         }
         else if (is_background) {
             backgroundComAnalysis(command, numOfCom);
+        }
+        else if (has_wildcard) {
+           wildcardsComAnalysis(command, numOfCom);
         }
 
         for (int i = 0; i <numOfCom; i++) {
@@ -80,7 +89,7 @@ int main (void) {
 
 
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) {
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard) {
 
     printf("in-mysh-now:>");
 
@@ -103,6 +112,10 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
     *is_background = false;
     if (strstr(read, "&") )
         *is_background = true;
+    
+    *has_wildcard = false;
+    if (strstr(read, "*") || strstr(read, "?"))
+        *has_wildcard = true;
 
     int i = 0;
     char** words = NULL;
@@ -239,4 +252,66 @@ void backgroundComAnalysis(char** command, int numOfCom) {
         }
 
     }
+}
+
+
+int match(char *pattern, char *str) {
+    if (*pattern == '\0' && *str == '\0') {
+        return 1;
+    }
+    if (*pattern == '*' && *(pattern + 1) != '\0' && *str == '\0') {
+        return 0;
+    }
+    if (*pattern == '?' || *pattern == *str) {
+        return match(pattern + 1, str + 1);
+    }
+    if (*pattern == '*') {
+        return match(pattern + 1, str) || match(pattern, str + 1);
+    }
+    return 0;
+}
+
+void wildcardsComAnalysis(char **command, int numOfCom) {
+    
+    int newNumCom = 0;
+    char **newCom = malloc(sizeof(char *) * (MAX_FILES+numOfCom));
+    for (int i = 0; i < numOfCom; i++) {
+        
+        if (strchr(command[i], '*') != NULL || strchr(command[i], '?') != NULL) {
+            
+            DIR *dir;
+            struct dirent *entry;
+            dir = opendir(".");
+            if (dir != NULL) {
+                
+                while ((entry = readdir(dir)) != NULL) {
+                    if (match(command[i], entry->d_name)) {
+                        newCom[newNumCom++] = strdup(entry->d_name);
+                    }
+                }
+                closedir(dir);
+            }
+        }
+        else {
+            newCom[newNumCom++] = strdup(command[i]);
+        }
+    }
+    // printf("0000%d\n", newNumCom);
+    // for (int i =0; i<newNumCom; i++) {
+    //     printf("%s\n", newCom[i]);
+    // }
+    // for (int i = 0; i < newNumCom; i++) {
+    //     command[num_newCom + i] = command[i];
+    //     command[i] = newCom[i];
+    // }
+    // command[newNumCom + 1] = NULL;
+    // for (int i=0; command[i] != NULL; i ++) {
+    //     printf("%s ", command[i]);
+    // }
+    // free(newCom);
+    execSimple(newCom);
+    for (int i =0; i < newNumCom; i++) {
+        free(newCom[i]);
+    }
+    free(newCom);
 }
