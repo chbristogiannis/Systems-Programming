@@ -14,50 +14,7 @@
 bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background) ;
 void execSimple(char** parsed);
 bool execRedirection(char** command, int numOfCom);
-
-
-void backgroundComAnalysis(char** command, int numOfCom) {
-    
-    char** background_command = (char**) malloc(MAX_ARGS * sizeof(char*));
-    int background_count = 0;
-
-    // Copy elements until "&" character is read
-    for (int i = 0; i < numOfCom; i++) {
-        if (strcmp(command[i], "&") == 0) {
-            for (int j=0; j < background_count; j++) {
-                printf("%s\n", background_command[j]);
-            }
-            background_command[background_count] = NULL;
-            
-            // pid_t pid = fork();
-            // if (pid == -1) {
-            //     perror("fork");
-            //     return;
-            // } else if (pid == 0) {
-            //     if (execvp(parsed[0], parsed) < 0) {
-            //         printf("\nCould not execute command..\n");
-            //     }
-            //     exit(0);
-            // } else {
-            //     int status;
-            //     waitpid(pid, &status, 0);
-            // }
-
-            
-            for (int j=0; j < background_count; j++) {
-                free(background_command[j]);
-            }
-            background_count = 0;
-        }
-        else {
-            background_command[background_count] = (char*) malloc(strlen(command[i]) + 1);
-            strcpy(background_command[background_count], command[i]);
-            background_count++;
-        }
-
-    }
-}
-
+void backgroundComAnalysis(char** command, int numOfCom) ;
 
 int main (void) {
     
@@ -245,4 +202,41 @@ bool execRedirection(char** command, int numOfCom) {
     close(orig_out);
 
     return true;
+}
+
+void backgroundComAnalysis(char** command, int numOfCom) {
+    
+    char** background_command = (char**) malloc(MAX_ARGS * sizeof(char*));
+    int background_count = 0;
+
+    // Copy elements until "&" character is read
+    for (int i = 0; i < numOfCom; i++) {
+        if (strcmp(command[i], "&") == 0) {
+            for (int j=0; j < background_count; j++) {
+                printf("%s\n", background_command[j]);
+            }
+            background_command[background_count] = NULL;
+            
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("fork");
+                return;
+            } else if (pid == 0) {
+                if (execvp(background_command[0], background_command) < 0) {
+                    printf("\nCould not execute command..\n");
+                }
+                exit(0);
+            }
+            for (int j=0; j < background_count; j++) {
+                free(background_command[j]);
+            }
+            background_count = 0;
+        }
+        else {
+            background_command[background_count] = (char*) malloc(strlen(command[i]) + 1);
+            strcpy(background_command[background_count], command[i]);
+            background_count++;
+        }
+
+    }
 }
