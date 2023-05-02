@@ -14,33 +14,15 @@
 #define MAX_SIZE_ARG 100
 #define MAX_FILES 10
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) ;
+bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValue, int numAliases, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) ;
 void execSimple(char** parsed);
 bool execRedirection(char** command, int numOfCom);
 void backgroundComAnalysis(char** command, int numOfCom) ;
 int match(char *pattern, char *str);
 void wildcardsComAnalysis(char **command, int numOfCom) ;
+void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) ; 
 
-        // words = realloc(words, (i+1) * sizeof(char *));
-        // words[i] = strdup(word); 
 
-void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
-    if (strcmp(command[0], "createalias") == 0) {
-        *aliases = realloc(*aliases, (*numAliases+1)*sizeof(char*));
-        *aliasesValue = realloc(*aliases, (*numAliases+1)*sizeof(char*));
-        *aliases[*numAliases] = strdup(command[1]);
-        *aliases[*numAliases] = strdup(command[2]);
-        (*numAliases)++;
-    }
-    else {
-        for (int j=0; j < numOfCom; j++) {
-            if (strcmp(command[0], *aliases[j]) == 0) {
-                free(*aliases[j]);
-                free(*aliasesValue[j]);
-            }
-        }
-    }
-}
 
 int main (void) {
     
@@ -62,10 +44,10 @@ int main (void) {
     
     while (true) {
         
-        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase))
+        if (!readLine(&command, &numOfCom, aliases, aliases_value, num_aliases, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase))
             continue;
         
-        if (strcmp(command[0], "reutno\n") == 0)
+        if (strcmp(command[0], "returno\n") == 0)
             break;
         
         if (strcmp(command[0], "exit") == 0) {
@@ -81,11 +63,11 @@ int main (void) {
             continue;
         }
 
-        printf("%d %d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background, has_wildcard);
-        // for (int i = 0; i < numOfCom; i++)
-        //     printf("%s\n", command[i]);
+        printf("%d %d %d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background, has_wildcard, create_aliase);
+        for (int i = 0; i < numOfCom; i++)
+            printf("%s\n", command[i]);
         
-        if (!is_redirection && !is_piped && !is_background && !has_wildcard) {
+        if (!is_redirection && !is_piped && !is_background && !has_wildcard && !create_aliase) {
             execSimple(command);
         }
         else if (is_redirection && !is_piped && !is_background) {
@@ -126,7 +108,7 @@ int main (void) {
 
 
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) {
+bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValue, int numAliases, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) {
 
     printf("in-mysh-now:>");
 
@@ -137,6 +119,9 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
         perror("getline");
         exit(EXIT_FAILURE);
     }
+
+    // 
+    // 
 
     *is_redirection = false;
     if (strstr(read, "<") || strstr(read, ">") || strstr(read, ">>") )
@@ -161,20 +146,25 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
     int i = 0;
     char** words = NULL;
     char *word = strtok(read, " ");
-    // printf("Inside%d\n", numOfCom);
+    bool flag_changed = false;
     while (word != NULL && strcmp(word, "\n") != 0) {
-        // printf("%s\n", word);
-        if (i == MAX_ARGS) {
-                return false;
-        }
         words = realloc(words, (i+1) * sizeof(char *));
-        words[i] = strdup(word); 
+        for (int j=0; j != numAliases; j++) {
+            if (strcmp(word, aliases[j]) == 0) {
+                words[i] = strdup(aliasesValue[j]);
+                flag_changed = true;
+            }
+        }
+        // words = realloc(words, (i+1) * sizeof(char *));
+        if (!flag_changed) {
+            words[i] = strdup(word);
+        }
+        flag_changed = false;
         i++;
         word = strtok(NULL, " ");
     }
     *numOfCom = i;
     *command = words;
-    // printf("Ending\n");
 
     return true;
 }
@@ -355,4 +345,23 @@ void wildcardsComAnalysis(char **command, int numOfCom) {
         free(newCom[i]);
     }
     free(newCom);
+}
+
+void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
+    if (strcmp(command[0], "createalias") == 0) {
+        *aliases = realloc(*aliases, (*numAliases+1)*sizeof(char*));
+        *aliasesValue = realloc(*aliasesValue, (*numAliases+1)*sizeof(char*));
+        (*aliases)[*numAliases] = strdup(command[1]);
+        (*aliasesValue)[*numAliases] = strdup(command[2]);
+        (*numAliases)++;
+    }
+    else {
+        for (int j=0; j < numOfCom; j++) {
+            if (strcmp(command[1], *aliases[j]) == 0) {
+                free((*aliases)[j]);
+                free((*aliasesValue)[j]);
+                (*numAliases)--;
+            }
+        }
+    }
 }
