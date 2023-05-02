@@ -14,12 +14,33 @@
 #define MAX_SIZE_ARG 100
 #define MAX_FILES 10
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard) ;
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) ;
 void execSimple(char** parsed);
 bool execRedirection(char** command, int numOfCom);
 void backgroundComAnalysis(char** command, int numOfCom) ;
 int match(char *pattern, char *str);
 void wildcardsComAnalysis(char **command, int numOfCom) ;
+
+        // words = realloc(words, (i+1) * sizeof(char *));
+        // words[i] = strdup(word); 
+
+void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
+    if (strcmp(command[0], "createalias") == 0) {
+        *aliases = realloc(*aliases, (*numAliases+1)*sizeof(char*));
+        *aliasesValue = realloc(*aliases, (*numAliases+1)*sizeof(char*));
+        *aliases[*numAliases] = strdup(command[1]);
+        *aliases[*numAliases] = strdup(command[2]);
+        (*numAliases)++;
+    }
+    else {
+        for (int j=0; j < numOfCom; j++) {
+            if (strcmp(command[0], *aliases[j]) == 0) {
+                free(*aliases[j]);
+                free(*aliasesValue[j]);
+            }
+        }
+    }
+}
 
 int main (void) {
     
@@ -28,16 +49,21 @@ int main (void) {
     bool is_piped= false;
     bool is_background = false;
     bool has_wildcard = false;
+    bool create_aliase = false;
 
     char** command = NULL;
+    
+    char** aliases = NULL;
+    char** aliases_value = NULL;
+    int num_aliases = 0;
     // char** command = malloc(MAX_ARGS * sizeof(char*));
     // for (int i=0; i < MAX_ARGS; i++)
     //     command[i] = malloc(MAX_SIZE_ARG* sizeof(char*));
     
     while (true) {
         
-        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background, &has_wildcard))
-            continue;;
+        if (!readLine(&command, &numOfCom, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase))
+            continue;
         
         if (strcmp(command[0], "reutno\n") == 0)
             break;
@@ -71,13 +97,24 @@ int main (void) {
         else if (has_wildcard) {
            wildcardsComAnalysis(command, numOfCom);
         }
+        else if (create_aliase) {
+            aliasesHandler(command, numOfCom, &aliases, &aliases_value, &num_aliases);
+        }
 
         for (int i = 0; i <numOfCom; i++) {
             free(command[i]);
         }
         free(command);
     }
-    
+
+    if (aliases != NULL) {
+        for (int i=0; i < num_aliases; i ++){
+            free(aliases[i]);
+            free(aliases_value[i]);
+        }
+        free(aliases);
+        free(aliases_value);
+    }
     printf("Exiting ...\n");
     // for (int i = 0; i < MAX_ARGS; i++) {
     //     free(command[i]);
@@ -89,7 +126,7 @@ int main (void) {
 
 
 
-bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard) {
+bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) {
 
     printf("in-mysh-now:>");
 
@@ -116,6 +153,10 @@ bool readLine(char*** command, int* numOfCom, bool* is_redirection, bool* is_pip
     *has_wildcard = false;
     if (strstr(read, "*") || strstr(read, "?"))
         *has_wildcard = true;
+    
+    *create_aliases = false;
+    if (strstr(read, "createalias") || strstr(read, "destroyalias"))
+        *create_aliases = true;
 
     int i = 0;
     char** words = NULL;
