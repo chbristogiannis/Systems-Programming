@@ -10,6 +10,10 @@
 
 #include <dirent.h>
 
+#include <string.h>
+// compile with -lreadline
+#include <readline/history.h>
+
 #define MAX_ARGS 10
 #define MAX_SIZE_ARG 100
 #define MAX_FILES 10
@@ -22,46 +26,82 @@ int match(char *pattern, char *str);
 void wildcardsComAnalysis(char **command, int numOfCom) ;
 void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) ; 
 
+void update_history(char* line) {
+    add_history(line);
+    using_history();
+    HISTORY_STATE *myhist = history_get_history_state();
+    HIST_ENTRY *entry;
 
+    if (myhist->length <= MAX_HISTORY)
+        return;
+    entry = remove_history(0);
+    free(entry);
+}
+
+bool historyHandler(char** line) {
+
+    int index;
+    char* line_copy = strdup(*line);
+    char* word1 = strtok(line_copy, " ");
+    char* word2 = strtok(NULL, " ");
+    
+    using_history();
+    HISTORY_STATE *myhist = history_get_history_state();
+    HIST_ENTRY *mylist;
+    if (word2 == NULL) {
+
+        printf("\nHistory, length %d:\n", myhist->length);
+        for (int i = 0; i < myhist->length; i++) {
+            mylist = history_get(i + 1);
+            printf("%d. %8s", myhist->length - i, mylist->line);
+        }
+    }
+    else if ((index = atoi(word2)) != 0) {
+        if (myhist->length == myhist->length - (index)) 
+            printf("\n!ERROR!, myhistory can't reference itself\n");
+        
+        else if (myhist->length >= index) {
+            mylist = history_get(index);
+            strcpy(*line, mylist->line);
+            free(line_copy);
+            return true;
+        }
+    }
+    else 
+        printf("\nindex must be a integer or NULL\n");
+
+    free(line_copy);
+    return false;
+}
 
 int main (void) {
     
-    int numOfCom = 0;
-    bool is_redirection = false;
-    bool is_piped= false;
-    bool is_background = false;
-    bool has_wildcard = false;
-    bool create_aliase = false;
+    bool is_redirection, is_piped, is_background, has_wildcard, create_aliase;
 
     char** command = NULL;
+    int numOfCom = 0;
     
     char** aliases = NULL;
-    char** aliases_value = NULL;
-    int num_aliases = 0;
-    // char** command = malloc(MAX_ARGS * sizeof(char*));
-    // for (int i=0; i < MAX_ARGS; i++)
-    //     command[i] = malloc(MAX_SIZE_ARG* sizeof(char*));
+    char** aliasesValue = NULL;
+    int numAliases = 0;
     
     while (true) {
         
-        if (!readLine(&command, &numOfCom, aliases, aliases_value, num_aliases, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase))
-            continue;
-        
-        if (strcmp(command[0], "returno\n") == 0)
-            break;
+        if (!readLine(&command, &numOfCom, aliases, aliasesValue, numAliases, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase))
+            continue;;
         
         if (strcmp(command[0], "exit") == 0) {
             break;
         }
-        else if (strcmp(command[0], "cd") == 0) {
-            if (numOfCom == 1) {
-                chdir(getenv("HOME"));
-            }
-            else {
-                chdir(command[1]);
-            }
-            continue;
-        }
+        // else if (strcmp(command[0], "cd") == 0) {
+        //     if (numOfCom == 1) {
+        //         chdir(getenv("HOME"));
+        //     }
+        //     else {
+        //         chdir(command[1]);
+        //     }
+        //     continue;
+        // }
 
         printf("%d %d %d %d %d %d\n", numOfCom, is_redirection, is_piped, is_background, has_wildcard, create_aliase);
         for (int i = 0; i < numOfCom; i++)
@@ -80,7 +120,7 @@ int main (void) {
            wildcardsComAnalysis(command, numOfCom);
         }
         else if (create_aliase) {
-            aliasesHandler(command, numOfCom, &aliases, &aliases_value, &num_aliases);
+            aliasesHandler(command, numOfCom, &aliases, &aliasesValue, &numAliases);
         }
 
         for (int i = 0; i <numOfCom; i++) {
@@ -90,19 +130,16 @@ int main (void) {
     }
 
     if (aliases != NULL) {
-        for (int i=0; i < num_aliases; i ++){
+        for (int i=0; i < numAliases; i ++){
             free(aliases[i]);
-            free(aliases_value[i]);
+            free(aliasesValue[i]);
         }
         free(aliases);
-        free(aliases_value);
+        free(aliasesValue);
     }
+
     printf("Exiting ...\n");
-    // for (int i = 0; i < MAX_ARGS; i++) {
-    //     free(command[i]);
-    // }
-    // free(command);
-    
+
     return 0;
 }
 
@@ -110,18 +147,22 @@ int main (void) {
 
 bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValue, int numAliases, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) {
 
-    printf("in-mysh-now:>");
+    printf("\nin-mysh-now:>");
 
     // Read Line
-    char* read;
+    char* read = NULL;
     size_t len = 0;
     if (getline(&read, &len, stdin) == -1) {
         perror("getline");
         exit(EXIT_FAILURE);
     }
 
-    // 
-    // 
+    if (strstr(read, "myHistory ") || strstr(read, "myHistory\n")) {
+        if (!historyHandler(&read))
+            return false;
+    }
+    else 
+        update_history(read);
 
     *is_redirection = false;
     if (strstr(read, "<") || strstr(read, ">") || strstr(read, ">>") )
@@ -155,7 +196,6 @@ bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValu
                 flag_changed = true;
             }
         }
-        // words = realloc(words, (i+1) * sizeof(char *));
         if (!flag_changed) {
             words[i] = strdup(word);
         }
@@ -163,9 +203,16 @@ bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValu
         i++;
         word = strtok(NULL, " ");
     }
+    if (strstr(words[i-1], "\n")) {
+        words[i-1][strlen(words[i-1])-1] = '\0';
+    }
+    // words = realloc(words, (i+1) * sizeof(char *));
+    // // words[i] = calloc(1, sizeof(char*));
+    // words[i] = NULL;
+    // i++;
+
     *numOfCom = i;
     *command = words;
-
     return true;
 }
 
@@ -188,7 +235,7 @@ void execSimple(char** parsed) {
 
 bool execRedirection(char** command, int numOfCom) {
     int in = STDIN_FILENO, out = STDOUT_FILENO;
-    int orig_in = dup(in), orig_out = dup(out); // store original file descriptors
+    int orig_in = dup(in), orig_out = dup(out);
     for (int i = 0; i < numOfCom; i++) {
         if (strcmp(command[i], "<") == 0) {
             if (i == numOfCom - 1) {
@@ -347,6 +394,8 @@ void wildcardsComAnalysis(char **command, int numOfCom) {
     free(newCom);
 }
 
+// prepei na αλλάξειώστε να κάνει handle όταν το aliasesValue ρίναι δύο λέξεις μπορεί εύκολα να αλλάξει στο readline
+// με strtok να τρέχει επαναληπτικά
 void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
     if (strcmp(command[0], "createalias") == 0) {
         *aliases = realloc(*aliases, (*numAliases+1)*sizeof(char*));
