@@ -17,6 +17,7 @@
 #define MAX_ARGS 10
 #define MAX_SIZE_ARG 100
 #define MAX_FILES 10
+#define MAX_HISTORY 20
 
 bool readLine(char*** command, int* numOfCom, char** aliases, char** aliasesValue, int numAliases, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases) ;
 void execSimple(char** parsed);
