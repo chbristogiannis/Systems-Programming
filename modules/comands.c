@@ -134,7 +134,6 @@ char** comBrk2(char* command, char* remove, int* comNum) {
 
 
 void comSimpleExec(char** command) {
-    printf("HERE_FAILLED\n");
     pid_t pid = fork();
     if (pid == -1) {
         perror("fork");
