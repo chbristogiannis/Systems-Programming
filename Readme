@@ -1,0 +1,59 @@
+Υποστήριξη Ανακατευθύνσεων (< > >>):
+    Symbols: 1. <   2. >    3. >>
+    Example: cat < a.txt > b.txt
+    SOS it is important the symbols to have space between ( < ) no (<)
+    Αρχεία: redirection.c   redirection.h
+
+
+Υποστήριξη σωληνώσεων (pipes)
+    Symbol: 1. |
+    Αρχεία: pipes.c pipes.h
+
+
+Εκτέλεση εντολών στο Background (&):
+    Symbol: 1. &
+    Example: ls & cat a.txt
+    Sos cant be combines with Alias myHistory
+    Αρχεία: background.c background.h
+
+
+Διαχείριση aliases:
+    Commands: 1. createalias    2. destroyalias
+    Example: createalias i i*.txt
+        In every command that it finds " i " it will replace it with: i*.txt
+    SOS createalias i "i*.txt" it will replace i with: "i*.txt" not with: i*.txt
+    SOS when we want to use an alias make sure that the alias is beetween empty spaces for exaple:
+        right(cat i ) wrong(cat i)
+    Αρχεία: alias.c alias.h
+
+
+Υποστήριξη wild characters:
+    Symbols: 1. *    2. ? 
+    Example: ls file*.t?t
+    Αρχεία: wildcharacters.c wildcharacters.h
+
+
+Αποθήκευση ιστορικού (myHistory):
+    Commands: 1. myHistory  2. myHistory Number
+    Example: myHistory 4
+    Αρχεία: myHistory.c myHistory.h
+
+
+Διαχείριση Σημάτων (Signals):
+    Commands: 1. Cntr-c     2. Cntr-z
+    Δεν λειτουργεί το Cntr-z
+    Το Cntr-c δεν είνει affect όσο αφορά το shell αλλα τερματίζει όλες τα child process αν υπάρχουν
+    Αρχεία: Signals.c Signals.h
+
+
+Εξτρα αρχεία:
+    common.h: Περιέχει define τιμές που χρησιμοποιούνται στον κώδικα
+    shell.c: Το fuction που βρίκεται το shell
+    command.c/h: Αρχείο που διαχειρίζεται commands είτε flags είτε αλλάζει την δομή τους.
+    main.c: υπάρχει για να καλέσει την shell
+
+Εντολές εκτέλεισεις του αρχείου:
+    make: μεταγλώτιση
+    make main: μεταγλώτιση
+    make clean: διαγραφεί όλων των .ο αρχείων
+    make run: εκτέλεση

@@ -5,10 +5,18 @@
 #include "../include/history.h"
 
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 
 
+// The function first breaks the command into individual commands separated by the pipe character '|' 
+// It then iterates over each command in the resulting array, creating a pipe and forking a child process for each one.
+// In the child process, the input and output file descriptors are set up using dup2 to connect to the appropriate end of the pipe, 
+// and the command is executed using comSimpleExec, wildcardsComAnalysis, or execRedirection, depending on the flags set by comInfo1.
+// The function returns false if there are no errors and true otherwise.
 bool pipeComAnalysis(char** command, int numOfCom, bool is_back) {
     int i;
     int pipefd[2];
@@ -22,26 +30,23 @@ bool pipeComAnalysis(char** command, int numOfCom, bool is_back) {
     for (i = 0; i < pipNum; i++) {
         if (pipe(pipefd) < 0) {
             perror("pipe");
-            exit(1);
+            return true;
         }
         
         if ((pid = fork()) < 0) {
             perror("fork");
-            exit(EXIT_FAILURE);
+            return true;
         } 
         else if (pid == 0) {
-            /* child process */
+            
             dup2(in, 0); 
             if (i < pipNum - 1) {
                 dup2(pipefd[1], 1); 
             }
             close(pipefd[0]);
-            int counter = 0;
-            for (counter; pipeCom[i][counter] != NULL; counter++) {
-                // printf("%s\n", pipeCom[i][counter]);
-            }
+
+            int counter = countArgs(pipeCom[i]);
             comInfo1(pipeCom[i], counter, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase, &is_history);
-            // printf("%d %d %d %d %d %d\n", counter, is_redirection, is_piped, is_background, has_wildcard, create_aliase);
             
             if (is_redirection) {
                 execRedirection(pipeCom[i], counter, is_back);
@@ -57,7 +62,6 @@ bool pipeComAnalysis(char** command, int numOfCom, bool is_back) {
             
         } 
         else {
-            
             waitpid(pid, &status, 0); 
             close(pipefd[1]); 
             in = pipefd[0]; 
@@ -72,5 +76,5 @@ bool pipeComAnalysis(char** command, int numOfCom, bool is_back) {
     }
     free(pipeCom);
 
-    return true;
+    return false;
 }

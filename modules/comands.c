@@ -1,11 +1,28 @@
+#include "../include/shell.h"
+#include "../include/aliases.h"
+#include "../include/background.h"
 #include "../include/comands.h"
-#include "../include/signals.h"
+#include "../include/common.h"
+#include "../include/history.h"
+#include "../include/pipes.h"
+#include "../include/redirection.h"
+#include "../include/signal.h"
+#include "../include/wildcharacters.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <readline/history.h>
 #include <sys/wait.h>
 
-
-void comInfo1(char** command, int numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases, bool* is_history) {
-   *is_history = false;
+// The function initializes all boolean pointers to false. Then, it loops through each element of the command array and checks for certain strings to
+// determine whether the given command contains 
+// redirection, piping, background processes, wildcard characters, or alias creation/destruction multiple commands.
+void comInfo1(char** command, int numOfCom, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases, bool* is_multi) {
+   *is_multi = false;
    *is_redirection = false;
    *is_piped = false;
    *is_background = false;
@@ -13,8 +30,8 @@ void comInfo1(char** command, int numOfCom, bool* is_redirection, bool* is_piped
    *create_aliases = false;
     for (int i=0; command[i] != NULL; i++) {
         
-        if (strstr(command[i], "myHistory ") || strstr(command[i], "myHistory\n")) 
-            *is_history = true;
+        if (strstr(command[i], " ; ") || strstr(command[i], ";\n")) 
+            *is_multi = true;
         
         if (strstr(command[i], "<") || strstr(command[i], ">") || strstr(command[i], ">>") )
             *is_redirection = true;
@@ -34,11 +51,14 @@ void comInfo1(char** command, int numOfCom, bool* is_redirection, bool* is_piped
     
 }
 
-void comInfo2(char* command, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases, bool* is_history) {
+// The function initializes all boolean pointers to false. Then, it loops through each element of the command array and checks for certain strings to
+// determine whether the given command contains 
+// redirection, piping, background processes, wildcard characters, or alias creation/destruction multiple commands.
+void comInfo2(char* command, bool* is_redirection, bool* is_piped, bool* is_background, bool* has_wildcard, bool* create_aliases, bool* is_multi) {
 
-    *is_history = false;
-    if (strstr(command, "myHistory ") || strstr(command, "myHistory")) 
-       *is_history = true;
+    *is_multi = false;
+    if (strstr(command, " ; ") || strstr(command, ";\n")) 
+       *is_multi = true;
 
     *is_redirection = false;
     if (strstr(command, "<") || strstr(command, ">") || strstr(command, ">>") )
@@ -61,6 +81,10 @@ void comInfo2(char* command, bool* is_redirection, bool* is_piped, bool* is_back
         *create_aliases = true;
 }
 
+
+// This function is used to break a command into individual commands by splitting it at a specific element (remove). 
+// It creates a two-dimensional array of strings, where each row represents a command and each column represents an argument. 
+// The comNum parameter is used to store the number of commands that were created.
 char*** comBrk1(char** command, char* remove, int* comNum) {
     
     char*** commands = (char***) malloc(MAX_COMMANDS * sizeof(char**));
@@ -90,12 +114,14 @@ char*** comBrk1(char** command, char* remove, int* comNum) {
     return commands;
 }
 
+// Τhis function is used to break a command into individual commands by splitting it at a specific character (remove). 
+// It creates an array of strings, where each element represents a command. 
+// The comNum parameter is used to store the number of commands that were created.
 char** comBrk2(char* command, char* remove, int* comNum) {
     // Trim leading whitespace
-    while (*command == ' ') {
+    while (*command == ' ')
         command++;
-    }
-
+    
     // Trim trailing whitespace
     int len = strlen(command);
     while (len > 0 && command[len - 1] == ' ') {
@@ -130,13 +156,15 @@ char** comBrk2(char* command, char* remove, int* comNum) {
     if (strlen(token) > 0) {
         result[i++] = token;
     }
+
     result[i] = NULL;
     *comNum = i;
 
     return result;
 }
 
-
+// Τhis function is used to execute a simple command by forking a new process and running the command in the child process using the execvp() system call. 
+// The is_back parameter is used to determine whether the function should wait for the command to finish executing before returning.
 void comSimpleExec(char** command, bool is_back) {
     pid_t pid = fork();
     if (pid == -1) {
@@ -150,17 +178,15 @@ void comSimpleExec(char** command, bool is_back) {
         }
         exit(0);
     } 
-    if (!is_back) {
 
-        signal(SIGINT, SIG_IGN);
-        signal(SIGTSTP, SIG_IGN);
+    if (!is_back) {
 
         int status;
         waitpid(pid, &status, 0);
     }
 }
 
-
+// Add space infront and back from a char useful for alias
 char* addSpaces(const char* str) {
     size_t len = strlen(str);
     char* newStr = malloc(len + 3);
@@ -175,11 +201,11 @@ char* addSpaces(const char* str) {
     return newStr;
 }
 
+
 void comAliasesReplace(char* command,  char** aliases, char** aliasesV, int aliasesNum) {
 
     for (int i=0; i < aliasesNum; i++) {
         char* temp = addSpaces(aliases[i]);
-        // printf("command is %s and aliases is %s\n", command, temp);
         char* pos = strstr(command, temp);
         if (pos != NULL) {
             size_t oldLen = strlen(temp);
@@ -191,5 +217,59 @@ void comAliasesReplace(char* command,  char** aliases, char** aliasesV, int alia
         }
         free(temp);
     }
-    // printf("command is %s \n", command);
+}
+// The purpose of adding spaces around the alias name and value is to ensure that the replacement 
+// only occurs when the alias is used as a separate word, not as part of a longer word.
+
+
+// The function starts by breaking up the command list into separate commands using the comBrk1() function. 
+// Then it goes through each command in the list and analyzes it for certain features, 
+// such as whether it contains a pipe (is_piped), a redirection (is_redirection), or a wildcard (has_wildcard).
+// and we execute them one after the other
+void multiComHandlere(char** commands, int numCom) {
+    
+    int numMCom;
+    char*** multCom = comBrk1(commands, ";",& numMCom);
+
+    bool is_redirection, is_piped, is_background, has_wildcard, create_aliase, is_multi;
+    
+    for (int i =0; multCom[i] != NULL; i++) { 
+        int counter = countArgs(multCom[i]);
+        comInfo1(multCom[i], counter, &is_redirection, &is_piped, &is_background, &has_wildcard, &create_aliase, &is_multi);
+        
+        if (is_background) {
+            backgroundComAnalysis(multCom[i], counter);
+        }
+        else if (is_piped) {
+            pipeComAnalysis(multCom[i], counter, false);
+        }
+        else if (has_wildcard) {
+           wildcardsComAnalysis(multCom[i], counter, false);
+        }
+        else if (is_redirection) {
+            if (execRedirection(multCom[i], counter, false));
+        }
+        else {
+            comSimpleExec(multCom[i], false);
+        }
+    }
+
+
+    for (int i =0; multCom[i] != NULL; i++) {
+        for (int j=0; multCom[i][j]!=NULL; j++) {
+            free(multCom[i][j]);
+        }
+        free(multCom[i]);
+    }
+    free(multCom);
+
+}
+
+
+int countArgs(char **command) {
+    int count = 0;
+    while (command[count] != NULL) {
+        count++;
+    }
+    return count;
 }

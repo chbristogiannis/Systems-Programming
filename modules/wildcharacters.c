@@ -2,7 +2,13 @@
 #include "../include/comands.h"
 
 #include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
 
+
+
+// This function is a recursive implementation of a pattern matching algorithm that checks whether a given string matches a pattern. 
+// The pattern can include the special characters '*' and '?'.
 int match(char *pattern, char *str) {
     if (*pattern == '\0' && *str == '\0') {
         return 1;
@@ -19,10 +25,10 @@ int match(char *pattern, char *str) {
     return 0;
 }
 
-// This code is for wildcard command analysis. It takes an array of strings (command) and the number of commands (numOfCom) as input. 
-// It creates a new array of strings (newCom) and scans each command in the input array. If a command contains a wildcard character (either '*' or '?'), it searches for all the files in the current directory that match the wildcard pattern using the match() function.
+// It creates a new array of strings (newCom) and scans each command in the input array. If a command contains a wildcard character (either '*' or '?'), 
+// it searches for all the files in the current directory that match the wildcard pattern using the match() function.
 // It then adds all the matching files to the new command array. If a command does not contain a wildcard character, it simply copies the command to the new command array.
-bool wildcardsComAnalysis(char **command, int numOfCom, bool is_back) {
+void wildcardsComAnalysis(char **command, int numOfCom, bool is_back) {
     
     int newNumCom = 0;
     char **newCom = malloc(sizeof(char *) * (MAX_FILES));
@@ -32,8 +38,8 @@ bool wildcardsComAnalysis(char **command, int numOfCom, bool is_back) {
             DIR *dir;
             struct dirent *entry;
             dir = opendir(".");
+            
             if (dir != NULL) {
-                
                 while ((entry = readdir(dir)) != NULL) {
                     if (match(command[i], entry->d_name)) {
                         newCom[newNumCom++] = strdup(entry->d_name);
@@ -46,8 +52,8 @@ bool wildcardsComAnalysis(char **command, int numOfCom, bool is_back) {
             newCom[newNumCom++] = strdup(command[i]);
         }
     }
-    newCom[newNumCom] = NULL;
 
+    newCom[newNumCom] = NULL;
     comSimpleExec(newCom, is_back);
 
     for (int i =0; i < newNumCom; i++) {
@@ -55,5 +61,4 @@ bool wildcardsComAnalysis(char **command, int numOfCom, bool is_back) {
     }
     free(newCom);
 
-    return true;
 }
