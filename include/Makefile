@@ -1,22 +1,32 @@
 # path
 MODULES = modules
+INCLUDE = 
 
-# Compile options. Το -I<dir> χρειάζεται για να βρει ο gcc τα αρχεία .h
-# CFLAGS = -Wall -Werror -g -I$(INCLUDE)
+# flags
+CFLAGS = -Wall
 
-# Αρχεία .o, εκτελέσιμο πρόγραμμα και παράμετροι
-OBJS = main.o $(MODULES)/shell.o $(MODULES)/redirection.o $(MODULES)/history.o $(MODULES)/aliases.o $(MODULES)/wildcharacters.o $(MODULES)/background.o  $(MODULES)/pipes.o $(MODULES)/comands.o $(MODULES)/signals.o
-#$(MODULES)/mapelements.o $(MODULES)/entity.o $(MODULES)/npc.o $(MODULES)/functions.o $(MODULES)/avatar.o
- 
-EXEC = exec
+# libraries
+LD = -lreadline
+
+# object files
+OBJS =  main.o $(MODULES)/history.o $(MODULES)/aliases.o $(MODULES)/signals.o $(MODULES)/shell.o $(MODULES)/redirection.o  $(MODULES)/wildcharacters.o $(MODULES)/background.o  $(MODULES)/pipes.o $(MODULES)/comands.o 
+
+# name of exec
+EXEC = main
+
+# args
 ARGS =
 
-# -g -fsanitize=address
+# compiler
+CC = gcc
+
+
 $(EXEC): $(OBJS)
-	gcc $(OBJS) -o $(EXEC) -lreadline
+	$(CC) $(CFLAGS) $(OBJS) -o $(EXEC) $(LD)
 
 clean:
 	rm -f $(OBJS) $(EXEC)
 
 run: $(EXEC)
 	./$(EXEC) $(ARGS)
+

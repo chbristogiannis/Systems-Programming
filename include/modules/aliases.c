@@ -1,14 +1,28 @@
 #include "../include/aliases.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-// It creates and destoyes alias
-// if the command is to createalias takes the next word and saves it to aliases and all the next ones to aliasesValue
-// if the command is to destroy a specific alias it finds it and frees it
-bool aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
+// The fuction is responsible for creating and deleting alias based on the given command
+// First finds what the command wants from the 2 options
+// If it wants to create an alias checks if alias exist with the same name and 
+// if the arguments are enouch to complete the procedure
+// Then add the next word to alias and the all the next ones to aliasesValue and adds to the size of them
+// If the command is to delete an alias finds it and delete it and the aliasesValue and decreases the size
+void aliasesHandler(char** command, int numOfCom, char ***aliases, char*** aliasesValue, int *numAliases) {
     for (int i =0; i < numOfCom; i ++) {
         if (strcmp(command[i], "createalias") == 0) {
+            for (int j=0; j < *numAliases; j++) {
+                int len1 = strlen(command[i+1]);
+                if (strcmp(command[i+1], (*aliases)[j]) == 0 || (strncmp(command[i+1],(*aliases)[j], len1-1) == 0 && strlen((*aliases)[j]) == len1-1)) {
+                    printf("There is already a alias with this name ... continue\n");
+                    return ;
+                }
+            }
+            
             if (i+2 >= numOfCom) {
                 printf("Not enough arguments");
-                return true;
+                return ;
             }
             *aliases = realloc(*aliases, (*numAliases+1)*sizeof(char*));
             *aliasesValue = realloc(*aliasesValue, (*numAliases+1)*sizeof(char*));
@@ -29,11 +43,12 @@ bool aliasesHandler(char** command, int numOfCom, char ***aliases, char*** alias
             }            
             (*aliases)[*numAliases] = strdup(command[i+1]);
             (*numAliases)++;
+            return;
         }
         else if (strcmp(command[i], "destroyalias") == 0){
             if (i+1 >= numOfCom) {
                 printf("Not enough arguments");
-                return true;
+                return;
             }
             for (int j=0; j < *numAliases; j++) {
                 int len1 = strlen(command[i+1]);
@@ -43,8 +58,7 @@ bool aliasesHandler(char** command, int numOfCom, char ***aliases, char*** alias
                     (*numAliases)--;
                 }
             }
+            return;
         }
     }
-
-    return false;
 }

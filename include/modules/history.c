@@ -5,23 +5,35 @@
 #include <stdlib.h>
 #include <string.h>
 
+// This function updates the command line history by adding the current line to the history with add_history
+// and removes the oldest entry if the history has reached MAX_HISTORY
 void historyUpdate(char* line) {
+    
     add_history(line);
+    
     using_history();
     HISTORY_STATE *myhist = history_get_history_state();
-    HIST_ENTRY *entry;
-
+    
     if (myhist->length <= MAX_HISTORY)
         return;
+    
+    HIST_ENTRY *entry;
     entry = remove_history(0);
     free(entry);
 }
 
+// The function first parses the user input to determine whether the user has requested 
+// to view previous commands or to execute a specific command from the history.
+// if the user wants to view the history, the function retrieves the history and print it.
+// If the user wants to execute a specific command from the history, 
+// the function retrieves the corresponding command from the history 
+// and copies the command to the input string passed as a parameter. 
+// The function then returns true to indicate that the user input has been modified.
 bool historyHandler(char** line) {
 
     int index;
     char* line_copy = strdup(*line);
-    char* word1 = strtok(line_copy, " ");
+    strtok(line_copy, " ");
     char* word2 = strtok(NULL, " ");
     
     using_history();
@@ -41,14 +53,14 @@ bool historyHandler(char** line) {
         
         else if (myhist->length >= index) {
             mylist = history_get(myhist->length - index  + 1);
-            printf("\n I chose this for some reason: %d. %8s", myhist->length + 1 - index, mylist->line);
             strcpy(*line, mylist->line);
             free(line_copy);
             return true;
         }
     }
-    else 
+    else {
         printf("\nindex must be a integer or NULL\n");
+    }
 
     free(line_copy);
     return false;
