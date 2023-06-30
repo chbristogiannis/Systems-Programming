@@ -1,30 +1,24 @@
 #include "poller.h"
-
 #include "helpers/helpers.h"
 #include "../common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <sys/socket.h> /* sockets */
-#include <netinet/in.h> /* internet sockets */
-#include <errno.h> /*EWOULDBLOCK EAGAIN*/
-
-#include <signal.h> /*SIGNT*/
-#include <fcntl.h> /*To terminate Master*/
-
-#include <unistd.h> // close function
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 // Signal Handlers
 volatile sig_atomic_t stop = 0;
 void sigint_handler(int signum) {
     stop = 1;  // Set the stop flag to break the while loop
-    printf("signit handler\n");
 }
 
-/////////////////////////////////////////////////////
-///        THREADS                                 //
+
 // Master Thread
 void* masterThread(void* arg) {
 
@@ -50,9 +44,9 @@ void* masterThread(void* arg) {
         return NULL;
     }
     struct sockaddr_in server;
-    server.sin_family = AF_INET;    // internet domain
+    server.sin_family = AF_INET;
     server.sin_addr . s_addr = htonl (INADDR_ANY);
-    server.sin_port = htons (args->portNum);  // given port number
+    server.sin_port = htons (args->portNum);
     
     //  Bind socket to address
     if (bind(sock, (struct sockaddr*)&server, sizeof(server)) < 0) {
@@ -72,17 +66,13 @@ void* masterThread(void* arg) {
 
     // While not Cntr-c pressed the server accept conection and pushes it to the buffer
     while (!stop) {
-        // printf("busy waiting\n");
         // Accept connection
         struct sockaddr_in client;
         socklen_t clientLen = sizeof(client);
-        // printf("1\n");
+
         int newsock = accept(sock, (struct sockaddr*)&client, &clientLen);
-        // printf("2\n");
         if (newsock < 0) {
             if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                // Αν ληφθεί το σήμα και διακοπεί το syscall,
-                // συνεχίζουμε την επανάληψη του loop
                 continue;
             } else {
                 perror("accept");
@@ -90,11 +80,9 @@ void* masterThread(void* arg) {
             }
         }
         buffer_push(args->buffer, newsock);
-        printf("Busy waiting\n");
     }
-    printf("2.Exiting master server\n");
-    
-    if (args->buffer->count == 0 && args->buffer->running == 0) {
+
+    if (args->buffer->running == 0) {
         for (int i = 0; i < args->numWorkerthreads; i++) {
             if (pthread_cancel(workerThreads[i]) != 0) {
                 printf("Error on worker thread cancel.\n");
@@ -109,18 +97,15 @@ void* masterThread(void* arg) {
             return NULL;
         }
     }
-    // printf("1.Exiting master server\n");
+
     return NULL;
 }
-// sigemptyset(&sa.sa_mask);
-// sigaddset(&sa.sa_mask, SIGINT);
 
 
 // Worker Thread
 pthread_mutex_t fileMutex = PTHREAD_MUTEX_INITIALIZER;
 void* workerThread(void* arg) {
-    
-    // printf("Worker Thread\n");
+
     ThreadArgs* args = (ThreadArgs*)arg;
     CircularBuffer* buffer = args->buffer;
     sigset_t mask;
@@ -132,30 +117,27 @@ void* workerThread(void* arg) {
     }
 
     while (!stop) {
-        // printf("I am waiting pos0\n");
 
         int sock = buffer_pop(buffer);
-
-        // printf("I am waiting pos1\n");
 
         // Receive voter name
         char voterName[512];
         ssize_t bytesRead = recv(sock, voterName, sizeof(voterName) - 1, 0);
         if (bytesRead <= 0) {
             close(sock);
+            buffer_runner(args->buffer);
             continue;
         }
         voterName[bytesRead] = '\0';
-        // printf("I am waiting pos2\n");
 
         // Check if voter has already voted
         pthread_mutex_lock(&fileMutex);
-        printf("I am server worker and i receive voter name:%s\n", voterName);
         if (hasVoted(voterName, args->pollLog)) {   // If he has voted exit
             pthread_mutex_unlock(&fileMutex);
             char* request = "ALREADY VOTED";
             send(sock, request, strlen(request), 0);
             close(sock);
+            buffer_runner(args->buffer);
             continue;
         }
 
@@ -163,6 +145,7 @@ void* workerThread(void* arg) {
         char* request = "SEND VOTE PLEASE";
         if (send(sock, request, strlen(request), 0) == -1) {
             perror("Server Error: Failed to send request");
+            close(sock);
             exit(EXIT_FAILURE);
         }
 
@@ -171,10 +154,10 @@ void* workerThread(void* arg) {
         bytesRead = recv(sock, vote, sizeof(vote) - 1, 0);
         if (bytesRead <= 0) {
             close(sock);
+            buffer_runner(args->buffer);
             continue;
         }
         vote[bytesRead] = '\0';
-        // printf("I am server worker and i receive vote: %s\n", vote);
         
         // Record voter and vote to the file poll log
         FILE* file = fopen(args->pollLog, "a");
@@ -183,8 +166,7 @@ void* workerThread(void* arg) {
             close(sock);
             exit(EXIT_FAILURE);
         }
-        // printf("I am a server worker let s write to the file\n");
-        // pthread_mutex_lock(&fileMutex);
+
         updateStats(vote, args->pollStats);
         fprintf(file, "%s %s\n", voterName, vote);
         pthread_mutex_unlock(&fileMutex);
@@ -195,12 +177,14 @@ void* workerThread(void* arg) {
         snprintf(response, sizeof(response), "VOTE for Party %s RECORDED", vote);
         if (send(sock, response, strlen(response), 0) == -1) {
             perror("Server Error: Failed to send request");
+            close(sock);
             exit(EXIT_FAILURE);
         }
 
         close(sock);
         buffer_runner(args->buffer);
     }
+
     return NULL;
 }
 

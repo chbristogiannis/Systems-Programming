@@ -7,7 +7,7 @@
 #include <string.h>
 
 int hasVoted(char* voterName, char* pollLog) {
-    // printf("%s\n", prolLog)
+    
     FILE* file = fopen(pollLog, "r");
     if (file == NULL) {
         perror("has voted error Error opening poll log file");
@@ -97,3 +97,31 @@ void updateStats(char* vote, char* filename){
     fclose(file);
 }
 
+
+void clean_createEmpty_file(char* prev) {
+    
+    // Open the file for reading and writing
+    FILE *file = fopen(prev, "r+");
+
+    // Check if the file exists
+    if (file == NULL) {     // File doesn't exist, create it
+        file = fopen(prev, "w");
+        if (file == NULL) {
+            printf("Error creating the file.\n");
+            exit(EXIT_FAILURE);
+        }
+        printf("File created: %s\n", prev);
+    } else {        // File exists, check if it's empty
+        fseek(file, 0, SEEK_END);
+        if (ftell(file) == 0) {     // File is empty
+            printf("File is already empty.\n");
+        } else {        // File is not empty, truncate it
+            freopen(prev, "w", file);
+            printf("File emptied: %s\n", prev);
+        }
+    }
+
+    // Close the file
+    fclose(file);
+
+}

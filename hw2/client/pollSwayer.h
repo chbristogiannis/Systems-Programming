@@ -1,6 +1,8 @@
 #pragma once
 #include "../common.h"
 
+
+// Data to sent to the thread
 typedef struct {
     char name[MAX_NAME_LENGTH];
     char vote[MAX_VOTE_LENGTH];
@@ -9,8 +11,5 @@ typedef struct {
 } ClientThreadData;
 
 
-
-
+// Thread fuction
 void *voteThread(void *arg);
-
-

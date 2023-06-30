@@ -1,0 +1,25 @@
+Εντολές μεταγλώτισης:
+    make poller
+    make pollSwayer
+
+Εντολές εκτέλεσης:
+    ./poller 5634 8 16 pollLog.txt pollStats.txt
+    ./pollSwayer linux01.di.uoa.gr 5634 inputFile.txt
+    ./create_input.sh political_parties.txt numLines
+    ./tallyVotes.sh tallyResultsFile
+    ./processLogFile.sh pollLog.txt
+
+
+Ο φάκελος client περιέχει όλα τα αρχεία που χρειάζονται για τον client:
+    main.c που περιέχει την main που δημιουργεί τα client threads
+    pollSwayer.c περιέχει την υλοποίηση των client thread
+    pollSwayer.h
+
+Ο φάκελος server περιέχει όλα τα αρχεία που χρειάζονται για τον server:
+    /buffer: περιέχει τα αρχεία .h και .c για την υλοποιήση ενώς κυκλικού buffer
+    /helpers: 3 βοηθητικές συναρτήσεις για τον server .h .c αρχεία
+    main.c: η υλοποίση της main
+    poller. c.h: περιέχει τα threads master και worker
+
+common.h:   define κοινες μεταβλητές
+Makefile:   

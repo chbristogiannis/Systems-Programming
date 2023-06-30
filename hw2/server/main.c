@@ -1,27 +1,16 @@
-// gcc -o poller poller.c -lpthread
-// ./poller 5634 4 16 pollLog.txt pollStats.txt
-
 #include "buffer/buffer.h"
 #include "poller.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#include <unistd.h> // close
-
-#include <semaphore.h> // for semaphores
-#include <pthread.h> // for threads
-
-#include <sys/socket.h> /* sockets */
-#include <netinet/in.h> /* internet sockets */
-#include <errno.h> /*EWOULDBLOCK EAGAIN*/
-
-
-
-
-
-//Extra
+#include <semaphore.h>
+#include <pthread.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <errno.h>
 
 
 
@@ -63,6 +52,9 @@ int main(int argc, char *argv[]) {
     args.pollLog = pollLog;
     args.pollStats = pollStats;
 
+    // File
+    clean_createEmpty_file(pollLog);
+    clean_createEmpty_file(pollStats);
 
     // Create master thread
     pthread_t master;

@@ -1,6 +1,7 @@
 #include "buffer.h"
 
 #include <stdlib.h>
+#include <stdio.h>/*printf*/
 
 
 
@@ -32,7 +33,7 @@ void buffer_push(CircularBuffer* buffer, int value) {
 }
 
 int buffer_pop(CircularBuffer* buffer) {
-    
+    printf("Buffer says Runner is %d\n", buffer->running);
     sem_wait(&buffer->full);   // Wait until there is at least one full slot
 
     pthread_mutex_lock(&buffer->mutex);
